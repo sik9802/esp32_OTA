@@ -8,9 +8,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
-  .dash { max-width: 480px; margin: 0 auto; padding: 1.25rem 1rem; }
-
-  /* 상단바 */
+  .dash { max-width: 520px; margin: 0 auto; padding: 1.25rem 1rem; }
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
   .topbar-title { font-size: 17px; font-weight: 600; }
   .device-id { font-size: 12px; color: #888; background: #ebebeb; padding: 3px 8px; border-radius: 6px; margin-left: 8px; }
@@ -18,27 +16,43 @@
   .conn-pill.on { background: #eaf6ee; border-color: #52b26a; color: #2a7a42; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; }
   .conn-pill.on .dot { background: #52b26a; }
-
-  /* OTA 카드 */
   .ota-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
-  .ota-title { font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px; }
+  .ota-title { font-size: 13px; font-weight: 600; margin-bottom: 0.75rem; }
   .ota-url-row { display: flex; gap: 8px; margin-bottom: 0.75rem; }
-  .ota-url-input { flex: 1; font-size: 12px; padding: 7px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; outline: none; }
+  .ota-url-input { flex: 1; font-size: 12px; padding: 7px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; outline: none; min-width: 0; }
   .ota-url-input:focus { border-color: #888; background: #fff; }
   .btn-ota { padding: 7px 16px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; white-space: nowrap; }
   .btn-ota:hover { background: #333; }
   .btn-ota:disabled { background: #ccc; cursor: not-allowed; }
-  .ota-preset { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ota-preset { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.5rem; }
   .ota-preset-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid #ddd; background: #fafafa; cursor: pointer; color: #555; }
   .ota-preset-btn:hover { background: #f0f0f0; border-color: #999; }
-  .ota-log { margin-top: 0.75rem; font-size: 11px; color: #888; min-height: 16px; }
-  .ota-log.ok { color: #2a7a42; }
-  .ota-log.err { color: #cc3333; }
-
-  /* 브로커 설정 */
+  .ota-result { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #f0f0f0; color: #666; }
+  .ota-result.ok { background: #eaf6ee; color: #2a7a42; }
+  .ota-result.fail { background: #fdecea; color: #cc3333; }
+  .ota-result.start { background: #fff8e1; color: #b07800; }
+  .term-card { background: #1a1a1a; border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+  .term-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+  .term-title { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
+  .term-dot { width: 6px; height: 6px; border-radius: 50%; background: #52b26a; }
+  .term-dot.off { background: #555; }
+  .term-controls { display: flex; gap: 6px; }
+  .btn-term { font-size: 11px; padding: 3px 8px; border-radius: 5px; border: 1px solid #444; background: #2a2a2a; color: #888; cursor: pointer; }
+  .btn-term:hover { background: #333; color: #aaa; }
+  .term-body { height: 220px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.6; }
+  .term-body::-webkit-scrollbar { width: 4px; }
+  .term-body::-webkit-scrollbar-track { background: #1a1a1a; }
+  .term-body::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+  .log-line { padding: 1px 0; word-break: break-all; }
+  .log-line .ts { color: #555; margin-right: 6px; }
+  .log-i { color: #7ec8a0; }
+  .log-w { color: #f0a030; }
+  .log-e { color: #e05a5a; }
+  .log-d { color: #888; }
+  .log-sys { color: #5a9ae0; font-style: italic; }
   .cfg-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
   .cfg-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; cursor: pointer; }
-  .cfg-header-left { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .cfg-header-left { font-size: 13px; font-weight: 500; }
   .cfg-chevron { font-size: 13px; color: #aaa; transition: transform 0.2s; }
   .cfg-body { padding: 0 1rem 1rem; display: none; }
   .cfg-body.open { display: block; }
@@ -52,14 +66,11 @@
   .btn-connect { width: 100%; padding: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #333; }
   .btn-connect:hover { background: #f0f0f0; }
   .btn-connect.active { background: #eaf6ee; border-color: #52b26a; color: #2a7a42; }
-
-  /* 하단 */
   .footer-bar { display: flex; justify-content: space-between; font-size: 11px; color: #bbb; padding: 0 2px; }
 </style>
 </head>
 <body>
 <div class="dash">
-
   <div class="topbar">
     <div style="display:flex;align-items:center">
       <span class="topbar-title">ESP32 OTA</span>
@@ -71,7 +82,6 @@
     </div>
   </div>
 
-  <!-- OTA 카드 -->
   <div class="ota-card">
     <div class="ota-title">⬆ OTA 펌웨어 업데이트</div>
     <div class="ota-url-row">
@@ -83,10 +93,25 @@
     <div class="ota-preset">
       <button class="ota-preset-btn" onclick="setUrl('https://github.com/sik9802/esp32_OTA/releases/download/v1.0/blink_test.bin')">v1.0</button>
     </div>
-    <div class="ota-log" id="ota-log">MQTT 연결 후 사용 가능합니다.</div>
+    <div id="ota-result" class="ota-result">⏸ 대기 중</div>
   </div>
 
-  <!-- 브로커 설정 -->
+  <div class="term-card">
+    <div class="term-header">
+      <div class="term-title">
+        <span class="term-dot off" id="term-dot"></span>
+        ESP32 시리얼 로그
+      </div>
+      <div class="term-controls">
+        <button class="btn-term" onclick="toggleScroll()">▼ <span id="scroll-label">자동스크롤</span></button>
+        <button class="btn-term" onclick="clearLog()">지우기</button>
+      </div>
+    </div>
+    <div class="term-body" id="term-body">
+      <div class="log-line log-sys">── MQTT 연결 후 로그가 표시됩니다 ──</div>
+    </div>
+  </div>
+
   <div class="cfg-card">
     <div class="cfg-header" onclick="toggleCfg()">
       <span class="cfg-header-left">⚙ 브로커 설정</span>
@@ -118,86 +143,134 @@
   </div>
 
   <div class="footer-bar">
-    <span id="last-action">마지막 동작: --</span>
+    <span id="last-action">마지막 전송: --</span>
     <span id="pub-count">전송 0건</span>
   </div>
-
 </div>
 
 <script>
 let client = null;
 let pubCount = 0;
+let autoScroll = true;
+const MAX_LOG_LINES = 200;
 
 function setUrl(url) {
   document.getElementById('ota-url').value = url;
 }
 
 function sendOta() {
-  if (!client || !client.connected) {
-    setLog('MQTT가 연결되지 않았습니다.', 'err');
-    return;
-  }
+  if (!client || !client.connected) { addLog('SYS', 'MQTT가 연결되지 않았습니다.'); return; }
   const url = document.getElementById('ota-url').value.trim();
-  if (!url) { setLog('URL을 입력하세요.', 'err'); return; }
-
+  if (!url) { addLog('E', 'URL을 입력하세요.'); return; }
   const topic = document.getElementById('cfg-topic').value.trim();
   client.publish(topic, url, { qos: 1 }, (err) => {
     if (err) {
-      setLog('전송 실패: ' + err.message, 'err');
+      setOtaResult('fail', '전송 실패: ' + err.message);
+      addLog('SYS', '전송 실패: ' + err.message);
     } else {
       pubCount++;
       const now = new Date().toLocaleTimeString('ko-KR');
-      setLog('전송 완료 → ESP32 OTA 시작 대기 중...', 'ok');
+      setOtaResult('start', 'ESP32 OTA 시작 대기 중...');
+      addLog('SYS', '▶ OTA URL 전송 완료 → ' + url);
       document.getElementById('last-action').textContent = '마지막 전송: ' + now;
       document.getElementById('pub-count').textContent = '전송 ' + pubCount + '건';
     }
   });
 }
 
-function setLog(msg, type) {
-  const el = document.getElementById('ota-log');
-  el.textContent = msg;
-  el.className = 'ota-log' + (type ? ' ' + type : '');
+function setOtaResult(type, msg) {
+  const el = document.getElementById('ota-result');
+  const icons = { ok: '✅', fail: '❌', start: '⏳', '': '⏸' };
+  el.textContent = (icons[type] || '⏸') + ' ' + msg;
+  el.className = 'ota-result ' + type;
+}
+
+function parseLogLine(raw) {
+  const m = raw.match(/^([IWED])\s*\((\d+)\)\s+([^:]+):\s*(.*)/);
+  if (m) return { level: m[1], time: m[2], tag: m[3].trim(), msg: m[4] };
+  return { level: 'D', time: '', tag: '', msg: raw };
+}
+
+function addLog(level, raw) {
+  const body = document.getElementById('term-body');
+  const p = parseLogLine(raw);
+  const line = document.createElement('div');
+  const ts = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+  const levelClass = { I: 'log-i', W: 'log-w', E: 'log-e', D: 'log-d', SYS: 'log-sys' };
+  const lv = p.level !== 'D' ? p.level : level;
+  line.className = 'log-line ' + (levelClass[lv] || 'log-d');
+  if (level === 'SYS') {
+    line.innerHTML = '<span class="ts">[' + ts + ']</span>' + raw;
+  } else {
+    const tag = p.tag ? '<span style="color:#aaa">[' + p.tag + ']</span> ' : '';
+    const timeStr = p.time ? '<span style="color:#555">(' + p.time + 'ms)</span> ' : '';
+    line.innerHTML = '<span class="ts">[' + ts + ']</span>' + tag + timeStr + p.msg;
+  }
+  while (body.children.length >= MAX_LOG_LINES) body.removeChild(body.firstChild);
+  body.appendChild(line);
+  if (autoScroll) body.scrollTop = body.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('term-body').innerHTML =
+    '<div class="log-line log-sys">── 로그 지움 ──</div>';
+}
+
+function toggleScroll() {
+  autoScroll = !autoScroll;
+  document.getElementById('scroll-label').textContent = autoScroll ? '자동스크롤' : '스크롤고정';
 }
 
 function setConnUI(state) {
   const pill = document.getElementById('conn-pill');
-  const dot = document.getElementById('dot');
   const label = document.getElementById('conn-label');
   const btn = document.getElementById('btn-conn');
   const btnOta = document.getElementById('btn-ota');
+  const termDot = document.getElementById('term-dot');
   if (state === 'connected') {
     pill.className = 'conn-pill on'; label.textContent = '연결됨';
     btn.textContent = '연결 해제'; btn.className = 'btn-connect active';
-    btnOta.disabled = false;
-    setLog('연결됨. OTA URL 확인 후 전송 버튼을 누르세요.', '');
+    btnOta.disabled = false; termDot.className = 'term-dot';
+    addLog('SYS', '── MQTT 연결됨. 로그 수신 시작 ──');
   } else if (state === 'connecting') {
-    pill.className = 'conn-pill'; dot.style.background = '#f0a030';
-    label.textContent = '연결 중...'; btn.textContent = '취소';
-    btnOta.disabled = true;
+    pill.className = 'conn-pill'; label.textContent = '연결 중...';
+    btn.textContent = '취소'; btnOta.disabled = true; termDot.className = 'term-dot off';
   } else {
-    pill.className = 'conn-pill'; dot.style.background = '#ccc';
-    label.textContent = '연결';
+    pill.className = 'conn-pill'; label.textContent = '연결';
     btn.textContent = '연결'; btn.className = 'btn-connect';
-    btnOta.disabled = true;
-    setLog('MQTT 연결 후 사용 가능합니다.', '');
+    btnOta.disabled = true; termDot.className = 'term-dot off';
+    addLog('SYS', '── MQTT 연결 해제 ──');
   }
 }
 
 function toggleConnect() {
-  if (client && client.connected) {
-    client.end(); client = null; setConnUI('disconnected'); return;
-  }
+  if (client && client.connected) { client.end(); client = null; setConnUI('disconnected'); return; }
   const host = document.getElementById('cfg-host').value.trim();
   const user = document.getElementById('cfg-user').value.trim();
   const pass = document.getElementById('cfg-pass').value;
   setConnUI('connecting');
-  client = mqtt.connect('wss://' + host + ':8884/mqtt', {
-    username: user, password: pass, reconnectPeriod: 0
+  client = mqtt.connect('wss://' + host + ':8884/mqtt', { username: user, password: pass, reconnectPeriod: 0 });
+  client.on('connect', () => {
+    setConnUI('connected');
+    client.subscribe('esp32/log');
+    client.subscribe('ota/result');
   });
-  client.on('connect', () => setConnUI('connected'));
-  client.on('error', () => { setConnUI('disconnected'); setLog('연결 오류. 브로커 설정을 확인하세요.', 'err'); });
+  client.on('error', (e) => { setConnUI('disconnected'); addLog('SYS', '연결 오류: ' + e.message); });
   client.on('offline', () => setConnUI('disconnected'));
+  client.on('message', (topic, msg) => {
+    const str = msg.toString();
+    if (topic === 'esp32/log') {
+      const level = str.match(/^([IWED])\s/) ? str[0] : 'D';
+      addLog(level, str);
+    } else if (topic === 'ota/result') {
+      try {
+        const d = JSON.parse(str);
+        setOtaResult(d.status, d.msg);
+        addLog('SYS', '▶ OTA 결과: ' + d.msg);
+        if (d.status === 'ok') addLog('SYS', '── ESP32 재시작 중... ──');
+      } catch(e) {}
+    }
+  });
 }
 
 function toggleCfg() {
