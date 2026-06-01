@@ -177,8 +177,8 @@
   </div>
 
   <div class="footer-bar">
-    <span id="last-action">마지막 전송: --</span>
-    <span id="pub-count">전송 0건</span>
+    <span id="last-action">마지막 수신: --</span>
+    <span id="pub-count">수신 0건</span>
   </div>
 </div>
 
@@ -210,12 +210,8 @@ function sendOta() {
       setOtaResult('fail', '전송 실패: ' + err.message);
       addOtaLog('SYS', '전송 실패: ' + err.message);
     } else {
-      pubCount++;
-      const now = new Date().toLocaleTimeString('ko-KR');
       setOtaResult('start', 'ESP32 OTA 시작 대기 중...');
       addOtaLog('SYS', '▶ OTA URL 전송 완료 → ' + url);
-      document.getElementById('last-action').textContent = '마지막 전송: ' + now;
-      document.getElementById('pub-count').textContent = '전송 ' + pubCount + '건';
     }
   });
 }
@@ -336,6 +332,10 @@ function toggleConnect() {
   client.on('offline', () => setConnUI('disconnected'));
   client.on('message', (topic, msg) => {
     const str = msg.toString();
+    pubCount++;
+    const now = new Date().toLocaleTimeString('ko-KR');
+    document.getElementById('last-action').textContent = '마지막 수신: ' + now;
+    document.getElementById('pub-count').textContent = '수신 ' + pubCount + '건';
     if (topic === 'esp32/log') {
       const level = str.match(/^([IWED])\s/) ? str[0] : 'D';
       if (isOtaLog(str)) {
