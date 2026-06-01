@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 Sensor Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #1a1a1a; min-height: 100vh; }
+
+  .dash { max-width: 480px; margin: 0 auto; padding: 1.25rem 1rem; }
+
+  /* 상단바 */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .topbar-title { font-size: 17px; font-weight: 600; }
+  .device-id { font-size: 12px; color: #888; background: #ebebeb; padding: 3px 8px; border-radius: 6px; margin-left: 8px; }
+  .conn-pill { display: flex; align-items: center; gap: 5px; font-size: 12px; padding: 5px 12px; border-radius: 20px; border: 1px solid #ddd; background: #fff; cursor: pointer; user-select: none; }
+  .conn-pill.on { background: #eaf6ee; border-color: #52b26a; color: #2a7a42; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; }
+  .conn-pill.on .dot { background: #52b26a; }
+
+  /* 메트릭 카드 */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+  .metric { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.1rem; }
+  .metric-label { font-size: 12px; color: #888; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+  .metric-val { font-size: 34px; font-weight: 600; line-height: 1; color: #1a1a1a; }
+  .metric-unit { font-size: 15px; font-weight: 400; color: #aaa; margin-left: 2px; }
+  .metric-delta { font-size: 11px; color: #aaa; margin-top: 5px; min-height: 14px; }
+  .metric-delta.up { color: #e05a2b; }
+  .metric-delta.dn { color: #2a7a42; }
+
+  /* 차트 */
+  .chart-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+  .chart-title { font-size: 13px; color: #888; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: #888; }
+  .leg-sq { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: middle; }
+
+  /* 브로커 설정 */
+  .cfg-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+  .cfg-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; cursor: pointer; }
+  .cfg-header-left { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .cfg-chevron { font-size: 13px; color: #aaa; transition: transform 0.2s; }
+  .cfg-body { padding: 0 1rem 1rem; display: none; }
+  .cfg-body.open { display: block; }
+  .cfg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cfg-field { display: flex; flex-direction: column; gap: 4px; }
+  .cfg-field.full { grid-column: 1 / -1; }
+  .cfg-field label { font-size: 11px; color: #888; }
+  .cfg-field input { font-size: 13px; padding: 6px 9px; border-radius: 7px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; width: 100%; outline: none; }
+  .cfg-field input:focus { border-color: #888; background: #fff; }
+  .cfg-footer { padding: 0.75rem 1rem; border-top: 1px solid #f0f0f0; }
+  .btn-connect { width: 100%; padding: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #333; }
+  .btn-connect:hover { background: #f0f0f0; }
+  .btn-connect.active { background: #eaf6ee; border-color: #52b26a; color: #2a7a42; }
+
+  /* 하단 */
+  .footer-bar { display: flex; justify-content: space-between; font-size: 11px; color: #bbb; padding: 0 2px; }
+</style>
+</head>
+<body>
+<div class="dash">
+
+  <div class="topbar">
+    <div style="display:flex;align-items:center">
+      <span class="topbar-title">ESP32 Sensor</span>
+      <span class="device-id">device_01</span>
+    </div>
+    <div id="conn-pill" class="conn-pill" onclick="toggleConnect()">
+      <span class="dot" id="dot"></span>
+      <span id="conn-label">연결</span>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">&#127777; 온도</div>
+      <div class="metric-val" id="temp-val">--<span class="metric-unit">℃</span></div>
+      <div class="metric-delta" id="temp-delta">&nbsp;</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">&#128167; 습도</div>
+      <div class="metric-val" id="humi-val">--<span class="metric-unit">%</span></div>
+      <div class="metric-delta" id="humi-delta">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-header">
+      <span class="chart-title">최근 10회 측정</span>
+      <div class="legend">
+        <span><span class="leg-sq" style="background:#e05a2b"></span>온도</span>
+        <span><span class="leg-sq" style="background:#1D9E75"></span>습도</span>
+      </div>
+    </div>
+    <div style="position:relative;height:140px">
+      <canvas id="hchart" role="img" aria-label="온도 및 습도 시계열 차트">실시간 온도·습도 데이터</canvas>
+    </div>
+  </div>
+
+  <div class="cfg-card">
+    <div class="cfg-header" onclick="toggleCfg()">
+      <span class="cfg-header-left">&#9881; 브로커 설정</span>
+      <span class="cfg-chevron" id="cfg-chev">&#9660;</span>
+    </div>
+    <div id="cfg-body" class="cfg-body">
+      <div class="cfg-grid">
+        <div class="cfg-field full">
+          <label>Broker host</label>
+          <input id="cfg-host" value="604efa86dab4428c9f2f4de139f5ca0a.s1.eu.hivemq.cloud">
+        </div>
+        <div class="cfg-field">
+          <label>Username</label>
+          <input id="cfg-user" value="chunsik">
+        </div>
+        <div class="cfg-field">
+          <label>Password</label>
+          <input id="cfg-pass" type="password" placeholder="패스워드">
+        </div>
+        <div class="cfg-field full">
+          <label>Topic</label>
+          <input id="cfg-topic" value="sensor/device_01/data">
+        </div>
+      </div>
+      <div class="cfg-footer">
+        <button class="btn-connect" id="btn-conn" onclick="toggleConnect()">연결</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <span id="last-update">마지막 수신: --</span>
+    <span id="msg-count">수신 0건</span>
+  </div>
+
+</div>
+
+<script>
+let client = null, hChart = null;
+let labels = [], tData = [], hData = [];
+let msgCount = 0, prevTemp = null, prevHumi = null;
+
+function initChart() {
+  hChart = new Chart(document.getElementById('hchart'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: '온도', data: [], borderColor: '#e05a2b', backgroundColor: 'rgba(224,90,43,0.07)', tension: 0.3, pointRadius: 3, borderWidth: 2, yAxisID: 'y' },
+        { label: '습도', data: [], borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,0.07)', tension: 0.3, pointRadius: 3, borderWidth: 2, yAxisID: 'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1) + (ctx.datasetIndex === 0 ? '℃' : '%') } }
+      },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxTicksLimit: 5, autoSkip: true }, grid: { display: false } },
+        y: { position: 'left', min: 0, max: 50, ticks: { font: { size: 10 }, callback: v => v + '℃' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y2: { position: 'right', min: 0, max: 100, ticks: { font: { size: 10 }, callback: v => v + '%' }, grid: { display: false } }
+      },
+      animation: { duration: 200 }
+    }
+  });
+}
+
+function updateMetrics(t, h) {
+  document.getElementById('temp-val').innerHTML = t.toFixed(1) + '<span class="metric-unit">℃</span>';
+  document.getElementById('humi-val').innerHTML = h.toFixed(1) + '<span class="metric-unit">%</span>';
+
+  if (prevTemp !== null) {
+    const td = (t - prevTemp), hd = (h - prevHumi);
+    const tEl = document.getElementById('temp-delta');
+    const hEl = document.getElementById('humi-delta');
+    tEl.textContent = (td >= 0 ? '▲ ' : '▼ ') + Math.abs(td).toFixed(1) + ' 이전 대비';
+    tEl.className = 'metric-delta ' + (td >= 0 ? 'up' : 'dn');
+    hEl.textContent = (hd >= 0 ? '▲ ' : '▼ ') + Math.abs(hd).toFixed(1) + ' 이전 대비';
+    hEl.className = 'metric-delta ' + (hd >= 0 ? 'up' : 'dn');
+  }
+  prevTemp = t; prevHumi = h;
+
+  const now = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  labels.push(now); tData.push(t); hData.push(h);
+  if (labels.length > 10) { labels.shift(); tData.shift(); hData.shift(); }
+
+  hChart.data.labels = [...labels];
+  hChart.data.datasets[0].data = [...tData];
+  hChart.data.datasets[1].data = [...hData];
+  hChart.update('none');
+
+  msgCount++;
+  document.getElementById('last-update').textContent = '마지막 수신: ' + now;
+  document.getElementById('msg-count').textContent = '수신 ' + msgCount + '건';
+}
+
+function setConnUI(state) {
+  const pill = document.getElementById('conn-pill');
+  const dot = document.getElementById('dot');
+  const label = document.getElementById('conn-label');
+  const btn = document.getElementById('btn-conn');
+  if (state === 'connected') {
+    pill.className = 'conn-pill on'; label.textContent = '연결됨';
+    btn.textContent = '연결 해제'; btn.className = 'btn-connect active';
+  } else if (state === 'connecting') {
+    pill.className = 'conn-pill'; dot.style.background = '#f0a030';
+    label.textContent = '연결 중...'; btn.textContent = '취소';
+  } else {
+    pill.className = 'conn-pill'; label.textContent = '연결';
+    btn.textContent = '연결'; btn.className = 'btn-connect';
+  }
+}
+
+function toggleConnect() {
+  if (client && client.connected) { client.end(); client = null; setConnUI('disconnected'); return; }
+  const host = document.getElementById('cfg-host').value.trim();
+  const user = document.getElementById('cfg-user').value.trim();
+  const pass = document.getElementById('cfg-pass').value;
+  const topic = document.getElementById('cfg-topic').value.trim();
+  setConnUI('connecting');
+  client = mqtt.connect('wss://' + host + ':8884/mqtt', { username: user, password: pass, reconnectPeriod: 3000 });
+  client.on('connect', () => { setConnUI('connected'); client.subscribe(topic); });
+  client.on('error', () => setConnUI('disconnected'));
+  client.on('offline', () => setConnUI('disconnected'));
+  client.on('message', (t, msg) => {
+    try { const d = JSON.parse(msg.toString()); if (d.temp != null && d.humi != null) updateMetrics(parseFloat(d.temp), parseFloat(d.humi)); } catch (e) {}
+  });
+}
+
+function toggleCfg() {
+  const body = document.getElementById('cfg-body');
+  const chev = document.getElementById('cfg-chev');
+  const open = body.classList.contains('open');
+  body.classList.toggle('open');
+  chev.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+initChart();
+</script>
+</body>
+</html>
