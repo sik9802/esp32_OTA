@@ -284,9 +284,13 @@ function toggleAppLog() {
   if (appLogPaused) {
     btn.textContent = '▶ 재개';
     btn.classList.add('paused');
+    if (client && client.connected)
+      client.publish('log/control', 'stop', { qos: 1 });
   } else {
     btn.textContent = '⏸ 일시정지';
     btn.classList.remove('paused');
+    if (client && client.connected)
+      client.publish('log/control', 'start', { qos: 1 });
   }
 }
 
