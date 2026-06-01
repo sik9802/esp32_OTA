@@ -1,0 +1,16 @@
+2026.04.25 mqtt 통신 구현
+
+1. 통신에러
+uart 단에서 배선 문제 발생시 계속해서 CRC가 어긋나게 된다 
+따라서 리셋이 불가피하다
+하지만, 485라인에서 배선 문제 발생시 다시 복구하면 이어서 통신 가능함
+
+2. 485컨버터 (파란 모듈) 통신 문제
+파란 모듈은 tx,rx 교차 결선이 아니라 직결 결선임
+
+1. ESP-NETIF API 문서
+https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/network/esp_netif_driver.html
+
+
+cd ~/esp/projects/blink_test
+claude

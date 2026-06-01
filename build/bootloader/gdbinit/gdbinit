@@ -1,0 +1,2 @@
+source /home/chunsik/esp/projects/blink_test/build/bootloader/gdbinit/symbols
+source /home/chunsik/esp/projects/blink_test/build/bootloader/gdbinit/connect

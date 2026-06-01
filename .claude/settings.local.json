@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(idf.py build *)",
+      "Bash(idf.py -p /dev/ttyUSB0 flash)",
+      "Bash(pkill -f \"idf.py\")",
+      "Bash(pkill -f \"ttyUSB0\")",
+      "Bash(fuser /dev/ttyUSB0)",
+      "Bash(timeout 60 idf.py -p /dev/ttyUSB0 monitor)",
+      "Bash(timeout 80 idf.py -p /dev/ttyUSB0 monitor)",
+      "Bash(timeout 70 python3 -c ' *)",
+      "Bash(timeout 35 python3 -c ' *)",
+      "Bash(timeout 30 python3 -c ' *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3)",
+      "Bash(stty -F /dev/ttyUSB0 115200 raw)",
+      "Read(//dev/**)",
+      "Bash(timeout 30 cat /dev/ttyUSB0)",
+      "Read(//tmp/**)"
+    ]
+  }
+}
