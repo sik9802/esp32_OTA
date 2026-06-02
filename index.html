@@ -129,6 +129,15 @@
     </div>
   </div>
 
+<!-- Config Portal Card -->
+<div class="ota-card" style="display:flex;align-items:center;justify-content:space-between;">
+  <div>
+    <div class="ota-title" style="margin-bottom:2px">⚙ Config Portal</div>
+    <div style="font-size:11px;color:#888">ESP32 파라미터 원격 설정</div>
+  </div>
+  <button class="btn-ota" id="btn-portal" onclick="sendConfigEnter()" disabled>진입</button>
+</div>
+
   <!-- App Log Terminal -->
   <div class="term-card">
     <div class="term-header">
@@ -256,6 +265,18 @@ function sendOta() {
     }
   });
 }
+ 
+function sendConfigEnter() {
+  if (!client || !client.connected) return;
+  client.publish('config/enter', '1', { qos: 1 }, (err) => {
+    if (err) {
+      addAppLog('SYS', 'Config Portal 전송 실패: ' + err.message);
+    } else {
+      addAppLog('SYS', '▶ Config Portal 진입 명령 전송 완료');
+      addAppLog('SYS', '브라우저에서 http://[ENC28J60_IP] 접속하세요');
+    }
+  });
+}
 
 function setOtaResult(type, msg) {
   const el = document.getElementById('ota-result');
@@ -342,20 +363,25 @@ function setConnUI(state) {
   const btnOta = document.getElementById('btn-ota');
   const appDot = document.getElementById('app-term-dot');
   const otaDot = document.getElementById('ota-term-dot');
+  const btnPortal = document.getElementById('btn-portal');
   if (state === 'connected') {
     pill.className = 'conn-pill on'; label.textContent = '연결됨';
     btn.textContent = '연결 해제'; btn.className = 'btn-connect active';
     btnOta.disabled = false;
+    btnPortal.disabled = false;
     appDot.className = 'term-dot'; otaDot.className = 'term-dot ota-active';
     addAppLog('SYS', '── MQTT 연결됨. 로그 수신 시작 ──');
   } else if (state === 'connecting') {
     pill.className = 'conn-pill'; label.textContent = '연결 중...';
-    btn.textContent = '취소'; btnOta.disabled = true;
+    btn.textContent = '취소'; 
+    btnOta.disabled = true;
+    btnPortal.disabled = true;
     appDot.className = 'term-dot off'; otaDot.className = 'term-dot off';
   } else {
     pill.className = 'conn-pill'; label.textContent = '연결';
     btn.textContent = '연결'; btn.className = 'btn-connect';
     btnOta.disabled = true;
+    btnPortal.disabled = true;
     appDot.className = 'term-dot off'; otaDot.className = 'term-dot off';
     addAppLog('SYS', '── MQTT 연결 해제 ──');
   }
@@ -372,6 +398,7 @@ function toggleConnect() {
     setConnUI('connected');
     client.subscribe('esp32/log');
     client.subscribe('ota/result');
+    client.subscribe('config/enter'); 
   });
   client.on('error', (e) => { setConnUI('disconnected'); addAppLog('SYS', '연결 오류: ' + e.message); });
   client.on('offline', () => setConnUI('disconnected'));
