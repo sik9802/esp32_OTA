@@ -30,7 +30,6 @@
   .ota-select-label { font-size: 11px; color: #888; white-space: nowrap; }
   .ota-select { flex: 1; font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; outline: none; cursor: pointer; }
   .ota-select:focus { border-color: #888; background: #fff; }
-  .ota-select-hint { font-size: 11px; color: #aaa; margin-bottom: 0.5rem; }
   .ota-result { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #f0f0f0; color: #666; }
   .ota-result.ok { background: #eaf6ee; color: #2a7a42; }
   .ota-result.fail { background: #fdecea; color: #cc3333; }
@@ -129,6 +128,30 @@
     </div>
   </div>
 
+  <!-- Config Portal Card -->
+  <div class="ota-card" style="display:flex;flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="ota-title" style="margin-bottom:2px">⚙ Config Portal</div>
+        <div style="font-size:11px;color:#888">ESP32 파라미터 원격 설정</div>
+      </div>
+      <button class="btn-ota" id="btn-portal" onclick="sendConfigEnter()" disabled>진입</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input id="portal-ip" class="ota-url-input" type="text"
+        placeholder="192.168.x.x (자동감지)" readonly
+        style="cursor:default;color:#aaa;">
+      <button class="btn-ota" id="btn-portal-open"
+        onclick="openPortal()" disabled
+        style="background:#444;">열기</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+     <button class="btn-ota" id="btn-restart"
+       onclick="sendRestart()" disabled
+       style="background:#c0392b;flex:1;">🔄 원격 재시작</button>
+    </div>
+  </div>
+
   <!-- App Log Terminal -->
   <div class="term-card">
     <div class="term-header">
@@ -206,14 +229,10 @@ async function loadReleases() {
     const res = await fetch('https://api.github.com/repos/' + GITHUB_REPO + '/releases');
     const releases = await res.json();
     sel.innerHTML = '';
-
-    // latest 고정 옵션 (항상 최상단)
     const latestOpt = document.createElement('option');
     latestOpt.value = 'https://github.com/' + GITHUB_REPO + '/releases/latest/download/' + BIN_FILENAME;
     latestOpt.textContent = '⭐ latest (최신)';
     sel.appendChild(latestOpt);
-
-    // 릴리즈 목록 (최신순)
     releases.forEach(r => {
       const asset = r.assets.find(a => a.name === BIN_FILENAME);
       if (!asset) return;
@@ -222,8 +241,6 @@ async function loadReleases() {
       opt.textContent = r.tag_name + (r.prerelease ? ' (pre)' : '');
       sel.appendChild(opt);
     });
-
-    // 기본값 URL과 일치하는 옵션 선택
     const currentUrl = document.getElementById('ota-url').value;
     for (const opt of sel.options) {
       if (opt.value === currentUrl) { opt.selected = true; break; }
@@ -238,7 +255,6 @@ function onSelectVersion() {
   if (sel.value) document.getElementById('ota-url').value = sel.value;
 }
 
-// 페이지 로드 시 자동 실행
 loadReleases();
 
 function sendOta() {
@@ -255,6 +271,48 @@ function sendOta() {
       addOtaLog('SYS', '▶ OTA URL 전송 완료 → ' + url);
     }
   });
+}
+
+function sendConfigEnter() {
+  if (!client || !client.connected) return;
+  client.publish('config/enter', '1', { qos: 1 }, (err) => {
+    if (err) {
+      addAppLog('SYS', 'Config Portal 전송 실패: ' + err.message);
+    } else {
+      addAppLog('SYS', '▶ Config Portal 진입 명령 전송 완료');
+      const ip = document.getElementById('portal-ip').value;
+      if (ip) addAppLog('SYS', '브라우저에서 http://' + ip + ' 접속하세요');
+      else    addAppLog('SYS', '브라우저에서 http://[ENC28J60_IP] 접속하세요');
+    }
+  });
+}
+ 
+function sendRestart() {
+  if (!client || !client.connected) return;
+  if (!confirm('ESP32를 재시작하시겠습니까?')) return;
+  client.publish('device/restart', '1', { qos: 1 }, (err) => {
+    if (err) {
+      addAppLog('SYS', '재시작 명령 전송 실패: ' + err.message);
+    } else {
+      addAppLog('SYS', '🔄 원격 재시작 명령 전송 완료');
+    }
+  });
+}
+ 
+// ── IP 자동 감지 ───────────────────────────────
+function tryParseIP(logStr) {
+  const m = logStr.match(/IP 할당: ([\d.]+)/);
+  if (m) {
+    const ipInput = document.getElementById('portal-ip');
+    ipInput.value = m[1];
+    ipInput.style.color = '#7ec8a0';
+    document.getElementById('btn-portal-open').disabled = false;
+  }
+}
+
+function openPortal() {
+  const ip = document.getElementById('portal-ip').value;
+  if (ip) window.open('http://' + ip, '_blank');
 }
 
 function setOtaResult(type, msg) {
@@ -304,6 +362,7 @@ function addOtaLog(level, raw) {
 
 function addAppLog(level, raw) {
   if (appLogPaused) return;
+  tryParseIP(raw);
   const line = buildLogElement(level, raw, level === 'SYS');
   appendToTerminal('app-term-body', line, autoScroll);
 }
@@ -342,20 +401,34 @@ function setConnUI(state) {
   const btnOta = document.getElementById('btn-ota');
   const appDot = document.getElementById('app-term-dot');
   const otaDot = document.getElementById('ota-term-dot');
+  const btnPortal = document.getElementById('btn-portal');
+  const btnRestart = document.getElementById('btn-restart');
+  const ipInput = document.getElementById('portal-ip');
+
   if (state === 'connected') {
     pill.className = 'conn-pill on'; label.textContent = '연결됨';
     btn.textContent = '연결 해제'; btn.className = 'btn-connect active';
     btnOta.disabled = false;
+    btnPortal.disabled = false;
+    btnRestart.disabled = false;
     appDot.className = 'term-dot'; otaDot.className = 'term-dot ota-active';
     addAppLog('SYS', '── MQTT 연결됨. 로그 수신 시작 ──');
   } else if (state === 'connecting') {
     pill.className = 'conn-pill'; label.textContent = '연결 중...';
-    btn.textContent = '취소'; btnOta.disabled = true;
+    btn.textContent = '취소';
+    btnOta.disabled = true;
+    btnPortal.disabled = true;
+    btnRestart.disabled = true;
     appDot.className = 'term-dot off'; otaDot.className = 'term-dot off';
   } else {
     pill.className = 'conn-pill'; label.textContent = '연결';
     btn.textContent = '연결'; btn.className = 'btn-connect';
     btnOta.disabled = true;
+    btnPortal.disabled = true;
+    btnRestart.disabled = true;
+    ipInput.value = '';
+    ipInput.style.color = '#aaa';
+    document.getElementById('btn-portal-open').disabled = true;
     appDot.className = 'term-dot off'; otaDot.className = 'term-dot off';
     addAppLog('SYS', '── MQTT 연결 해제 ──');
   }
@@ -372,6 +445,8 @@ function toggleConnect() {
     setConnUI('connected');
     client.subscribe('esp32/log');
     client.subscribe('ota/result');
+    client.subscribe('config/enter');
+     client.subscribe('esp32/info');
   });
   client.on('error', (e) => { setConnUI('disconnected'); addAppLog('SYS', '연결 오류: ' + e.message); });
   client.on('offline', () => setConnUI('disconnected'));
@@ -395,7 +470,14 @@ function toggleConnect() {
         addOtaLog('SYS', '▶ OTA 결과: ' + d.msg);
         if (d.status === 'ok') addOtaLog('SYS', '── ESP32 재시작 중... ──');
       } catch(e) {}
+    } else if (topic === 'esp32/info') {      // ← 여기
+    const ipInput = document.getElementById('portal-ip');
+    ipInput.value = str;
+    ipInput.style.color = '#7ec8a0';
+    document.getElementById('btn-portal-open').disabled = false;
+    addAppLog('SYS', '📡 ESP32 IP: ' + str);
     }
+   
   });
 }
 
