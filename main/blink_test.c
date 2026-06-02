@@ -44,7 +44,7 @@ void app_main(void)
        if (modbus_read_sensor(&sensor) == ESP_OK) {
             mqtt_publish_sensor(sensor.temperature, sensor.humidity);
         }
-        vTaskDelay(pdMS_TO_TICKS(3000));
+        vTaskDelay(pdMS_TO_TICKS(1000));
         
         // 디스에이블한 기능
         /*

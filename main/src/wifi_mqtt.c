@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "freertos/queue.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -10,6 +11,9 @@
 #include "nvs_flash.h"
 #include "wifi_mqtt.h"
 #include "enc28j60.h"
+#include "ota.h"
+#include <stdarg.h>
+
 
 
 #define TAG          "WIFI_MQTT"
@@ -19,11 +23,17 @@
 #define MQTT_USERNAME    "chunsik"
 #define MQTT_PASSWORD    "ESP32server"
 
+
+static QueueHandle_t s_log_queue = NULL;
+static bool s_mqtt_connected = false;
+static bool s_log_enabled = true;
+
 static esp_mqtt_client_handle_t s_mqtt_client = NULL;
 static EventGroupHandle_t s_eth_event_group;
 #define ETH_GOT_IP_BIT BIT0
 static EventGroupHandle_t s_net_events;
 #define IP_ACQUIRED_BIT  BIT0
+
 
 // ── ENC28J60 IP 할당 이벤트 ────────────────────
 static void eth_got_ip_handler(void *arg, esp_event_base_t base,
@@ -49,23 +59,84 @@ static void eth_lost_ip_handler(void *arg, esp_event_base_t base,
     esp_netif_dhcpc_start(netif);
 }
 
+static int mqtt_log_vprintf(const char *fmt, va_list args)
+{
+    va_list args2;
+    va_copy(args2, args);
+    int ret = vprintf(fmt, args);
+
+    if (s_mqtt_connected && s_log_queue != NULL) {
+        char *buf = malloc(128);
+        if (buf) {
+            vsnprintf(buf, 128, fmt, args2);
+            if (xQueueSend(s_log_queue, &buf, 0) != pdTRUE) {
+                free(buf);
+            }
+        }
+    }
+
+    va_end(args2);
+    return ret;
+}
+
+
+static void log_publish_task(void *arg)
+{
+    char *buf;
+    while (1) {
+        if (xQueueReceive(s_log_queue, &buf, portMAX_DELAY) == pdTRUE) {
+            if (s_mqtt_connected && s_mqtt_client != NULL && s_log_enabled) {  // ← s_log_enabled 추가
+                esp_mqtt_client_publish(
+                    s_mqtt_client, "esp32/log", buf, 0, 0, 0);
+            }
+            free(buf);
+        }
+    }
+}
+
 // ── MQTT 이벤트 핸들러 ─────────────────────────
 static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                                 int32_t event_id, void *event_data)
 {
+    esp_mqtt_event_handle_t event = event_data;  // ← 이 줄 추가
+    esp_mqtt_client_handle_t client = event->client;  // ← 이 줄 추가
+
     switch (event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "MQTT 브로커 연결 완료");
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGW(TAG, "MQTT 연결 끊김 → 자동 재연결");
-            break;
-        case MQTT_EVENT_ERROR:
-            ESP_LOGE(TAG, "MQTT 에러");
-            break;
-        default:
-            break;
-    }
+        
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "MQTT 브로커 연결 완료");
+        s_mqtt_connected = true;                           // ← 추가
+        esp_mqtt_client_subscribe(client, "ota/update", 1);
+        esp_mqtt_client_subscribe(client, "log/control", 1);  // ← 추가
+        break;
+    case MQTT_EVENT_DISCONNECTED:
+        s_mqtt_connected = false;                          // ← 추가
+        ESP_LOGW(TAG, "MQTT 연결 끊김 → 자동 재연결");
+        break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGE(TAG, "MQTT 에러");
+        break;
+    case MQTT_EVENT_DATA:
+        if (strncmp(event->topic, "ota/update", event->topic_len) == 0) {
+            static char url[256];
+            snprintf(url, sizeof(url), "%.*s", event->data_len, event->data);
+            ESP_LOGI(TAG, "OTA 트리거: %s", url);
+            xTaskCreate(ota_task, "ota_task", 8192, url, 5, NULL);
+        }
+        else if (strncmp(event->topic, "log/control", event->topic_len) == 0) {
+            if (strncmp(event->data, "stop", event->data_len) == 0) {
+                s_log_enabled = false;
+                ESP_LOGI(TAG, "로그 전송 중단");
+            } else if (strncmp(event->data, "start", event->data_len) == 0) {
+                s_log_enabled = true;
+                ESP_LOGI(TAG, "로그 전송 재개");
+            }
+        }
+        break;
+
+    default:
+        break;
+}
 }
 
 // ── 공개 API ───────────────────────────────────
@@ -122,9 +193,15 @@ esp_err_t mqtt_start(void)
     s_mqtt_client = client;
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
+    s_log_queue = xQueueCreate(20, sizeof(char *));
+    xTaskCreate(log_publish_task, "log_pub", 4096, NULL, 3, NULL);
+    esp_log_set_vprintf(mqtt_log_vprintf);
+    esp_log_set_vprintf(mqtt_log_vprintf);
 
     return ESP_OK;
 }
+
+
 
 /*  이전 mqtt_start(void)
 esp_err_t mqtt_start(void)

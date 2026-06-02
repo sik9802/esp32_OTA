@@ -101,7 +101,7 @@ static uint16_t enc28j60_phy_read(uint8_t addr)
     enc28j60_wcr(MICMD, 0x01);
     uint8_t miregadr_rb = enc28j60_rcr_mac(MIREGADR);
     uint8_t micmd_rb    = enc28j60_rcr_mac(MICMD);
-    ESP_LOGI(TAG, "[MII] MIREGADR=0x%02X(exp:0x%02X) MICMD=0x%02X(exp:0x01)",
+    ESP_LOGD(TAG, "[MII] MIREGADR=0x%02X(exp:0x%02X) MICMD=0x%02X(exp:0x01)",
              miregadr_rb, addr, micmd_rb);
     vTaskDelay(pdMS_TO_TICKS(15));  // MISTAT 체크 대신 고정 대기
     enc28j60_set_bank(2);           // MIRDL/MIRDH는 Bank2
@@ -240,14 +240,14 @@ esp_err_t enc28j60_init(void)
     enc28j60_set_bank(2);
     
     uint8_t econ1_check = enc28j60_rcr(ECON1);
-    ESP_LOGI(TAG, "[DBG] set_bank(2) 후 ECON1=0x%02X (bits[1:0] 기대값: 0x02)", econ1_check);
+    ESP_LOGD(TAG, "[DBG] set_bank(2) 후 ECON1=0x%02X (bits[1:0] 기대값: 0x02)", econ1_check);
 
     enc28j60_wcr(MACON1, 0xAB);
     uint8_t tx3[3] = {ENC_RCR | MACON1, 0, 0};
     uint8_t rx3[3] = {0};
     spi_transaction_t t3 = { .length=24, .tx_buffer=tx3, .rx_buffer=rx3 };
     spi_device_polling_transmit(spi, &t3);
-    ESP_LOGI(TAG, "[DBG] MACON1 write 0xAB → rx=[%02X,%02X,%02X]", rx3[0], rx3[1], rx3[2]);
+    ESP_LOGD(TAG, "[DBG] MACON1 write 0xAB → rx=[%02X,%02X,%02X]", rx3[0], rx3[1], rx3[2]);
     // ▲▲▲ 진단 코드 끝 ▲▲▲
     enc28j60_wcr(MACON3, 0x00);   // 클리어 먼저
     enc28j60_wcr(MACON1,  MACON1_MARXEN);
@@ -256,7 +256,7 @@ esp_err_t enc28j60_init(void)
         uint8_t rx[3] = {0};
         spi_transaction_t t = {.length=24, .tx_buffer=tx, .rx_buffer=rx};
         spi_device_polling_transmit(spi, &t);
-        ESP_LOGI(TAG, "[raw] MACON1 → [%02X,%02X,%02X]", rx[0],rx[1],rx[2]);
+        ESP_LOGD(TAG, "[raw] MACON1 → [%02X,%02X,%02X]", rx[0],rx[1],rx[2]);
     }
 
     enc28j60_wcr(MACON3,  MACON3_PADCFG0 | MACON3_TXCRCEN | MACON3_FRMLNEN);
@@ -265,7 +265,7 @@ esp_err_t enc28j60_init(void)
         uint8_t rx[3] = {0};
         spi_transaction_t t = {.length=24, .tx_buffer=tx, .rx_buffer=rx};
         spi_device_polling_transmit(spi, &t);
-        ESP_LOGI(TAG, "[raw] MACON3 → [%02X,%02X,%02X]", rx[0],rx[1],rx[2]);
+        ESP_LOGD(TAG, "[raw] MACON3 → [%02X,%02X,%02X]", rx[0],rx[1],rx[2]);
     }
     enc28j60_wcr(MABBIPG, 0x12);
     enc28j60_wcr(MAIPGL,  0xC2);
@@ -276,7 +276,7 @@ esp_err_t enc28j60_init(void)
     // 쓰기 확인 (rcr_mac: rx[1]=data, 이 칩은 dummy byte 없음)
     uint8_t m1 = enc28j60_rcr_mac(MACON1);
     uint8_t m3 = enc28j60_rcr_mac(MACON3);
-    ESP_LOGI(TAG, "MAC 쓰기 확인: MACON1=0x%02X(expect 0x01) MACON3=0x%02X(expect 0x32)", m1, m3);
+    ESP_LOGD(TAG, "MAC 쓰기 확인: MACON1=0x%02X(expect 0x01) MACON3=0x%02X(expect 0x32)", m1, m3);
 
     // ── Bank 3: MAC 주소 설정 (eFuse 기반) ──
     // MAADR1(0x04)=chip_mac[0](MSB) ... MAADR6(0x01)=chip_mac[5](LSB)
@@ -296,7 +296,7 @@ esp_err_t enc28j60_init(void)
     enc28j60_phy_write(PHCON2, 0x0100);  // HDLDIS=1: Half-Duplex Loopback Disable
     uint16_t phid1   = enc28j60_phy_read(0x02);
     uint16_t phstat1 = enc28j60_phy_read(0x01);
-    ESP_LOGI(TAG, "PHID1=0x%04X(expect 0x0083) PHSTAT1=0x%04X", phid1, phstat1);
+    ESP_LOGD(TAG, "PHID1=0x%04X(expect 0x0083) PHSTAT1=0x%04X", phid1, phstat1);
 
     // ── RX 활성화 ──────────────────────
     enc28j60_bfs(ECON1, ECON1_RXEN);
@@ -366,7 +366,7 @@ esp_err_t enc28j60_send_packet(const uint8_t *buf, uint16_t len)
     // TXRTS SET → 전송 시작
     enc28j60_bfs(ECON1, ECON1_TXRTS);
 
-    ESP_LOGI(TAG, "TX %d bytes", len);
+    ESP_LOGD(TAG, "TX %d bytes", len);
     xSemaphoreGive(s_spi_mutex);
     return ESP_OK;
 }
@@ -412,8 +412,8 @@ int enc28j60_recv_packet(uint8_t *buf, uint16_t max_len)
     // 실제 데이터 읽기 (CRC 4바이트 제외)
     uint16_t data_len = pkt_len - 4;
     enc28j60_rbm(buf, data_len);
-    ESP_LOGI(TAG, "RX %d bytes", data_len);
-    ESP_LOGI(TAG, "[RSV] rsv=[%02X %02X %02X %02X %02X %02X] next=0x%04X len=%d ok=%d",
+    ESP_LOGD(TAG, "RX %d bytes", data_len);
+    ESP_LOGD(TAG, "[RSV] rsv=[%02X %02X %02X %02X %02X %02X] next=0x%04X len=%d ok=%d",
             rsv[0], rsv[1], rsv[2], rsv[3], rsv[4], rsv[5],
          next_ptr, pkt_len, rx_ok);
 
@@ -503,7 +503,7 @@ static TaskHandle_t      s_rx_task = NULL;
 // lwIP이 패킷 송신 시 esp_netif가 이 함수를 호출
 static esp_err_t enc28j60_netif_transmit(void *h, void *buffer, size_t len)
 {
-    ESP_LOGI(TAG, "netif_transmit len=%d", len);
+    ESP_LOGD(TAG, "netif_transmit len=%d", len);
     return enc28j60_send_packet((uint8_t *)buffer, (uint16_t)len);
 }
 
@@ -518,12 +518,12 @@ static void enc28j60_free_rx_buffer(void *h, void *buffer)
 static void dhcp_watchdog_task(void *arg)
 {
     esp_netif_t *netif = (esp_netif_t *)arg;
-    vTaskDelay(pdMS_TO_TICKS(30000));  // 30초 대기
+    vTaskDelay(pdMS_TO_TICKS(10000));  // 10초 대기
     
     esp_netif_ip_info_t ip_info;
     esp_netif_get_ip_info(netif, &ip_info);
     if (ip_info.ip.addr == 0) {
-        ESP_LOGW(TAG, "DHCP 30초 실패 → 재시작");
+        ESP_LOGW(TAG, "DHCP 10초 실패 → 재시작");
         esp_restart();  // 소프트 리셋
     } else {
         vTaskDelete(NULL);
@@ -618,24 +618,24 @@ static void enc28j60_rx_task(void *arg)
                 enc28j60_set_bank(2);
                 uint8_t e1_check  = enc28j60_rcr(ECON1);
                 uint8_t macon1_2b = enc28j60_rcr(MACON1);
-                ESP_LOGI(TAG, "[diag] ECON1=0x%02X(bank bits 기대: 0x02) MACON1_2B=0x%02X",
+                ESP_LOGD(TAG, "[diag] ECON1=0x%02X(bank bits 기대: 0x02) MACON1_2B=0x%02X",
                          e1_check, macon1_2b);
 
                 uint8_t t3[3], r3[3];
                 spi_transaction_t st = { .length=24, .tx_buffer=t3, .rx_buffer=r3 };
                 t3[0] = ENC_RCR | MACON1; t3[1] = 0; t3[2] = 0;
                 memset(r3, 0, 3); spi_device_polling_transmit(spi, &st);
-                ESP_LOGI(TAG, "[diag] MACON1(0x00) 3-byte=[0x%02X,0x%02X,0x%02X](expect 0x01)",
+                ESP_LOGD(TAG, "[diag] MACON1(0x00) 3-byte=[0x%02X,0x%02X,0x%02X](expect 0x01)",
                          r3[0], r3[1], r3[2]);
                 t3[0] = ENC_RCR | MACON3; t3[1] = 0; t3[2] = 0;
                 memset(r3, 0, 3); spi_device_polling_transmit(spi, &st);
-                ESP_LOGI(TAG, "[diag] MACON3(0x02) 3-byte=[0x%02X,0x%02X,0x%02X](expect 0x32)",
+                ESP_LOGD(TAG, "[diag] MACON3(0x02) 3-byte=[0x%02X,0x%02X,0x%02X](expect 0x32)",
                          r3[0], r3[1], r3[2]);
 
                 uint16_t phid1  = enc28j60_phy_read(0x02);
                 uint16_t phstat = enc28j60_phy_read(PHSTAT1);
                 xSemaphoreGive(s_spi_mutex);
-                ESP_LOGI(TAG, "[diag] PHID1=0x%04X PHSTAT1=0x%04X Link:%s",
+                ESP_LOGD(TAG, "[diag] PHID1=0x%04X PHSTAT1=0x%04X Link:%s",
                          phid1, phstat, (phstat & PHSTAT1_LLSTAT) ? "UP" : "DOWN");
                 ESP_LOGI(TAG, "[diag] ISR count=%lu", (unsigned long)s_isr_count);
                 ESP_LOGI(TAG, "[diag] free heap=%lu", (unsigned long)esp_get_free_heap_size());
@@ -794,7 +794,7 @@ esp_err_t enc28j60_netif_init(esp_netif_t **out_netif)
         if (!(phstat & PHSTAT1_LLSTAT)) vTaskDelay(pdMS_TO_TICKS(100));
         retry++;
     }
-    ESP_LOGI(TAG, "PHY 링크 %s (PHSTAT1=0x%04X, %dms)",
+    ESP_LOGD(TAG, "PHY 링크 %s (PHSTAT1=0x%04X, %dms)",
              (phstat & PHSTAT1_LLSTAT) ? "UP" : "TIMEOUT",
              phstat, retry * 100);
 }
