@@ -425,6 +425,7 @@ function toggleConnect() {
     client.subscribe('esp32/log');
     client.subscribe('ota/result');
     client.subscribe('config/enter');
+     client.subscribe('esp32/info');
   });
   client.on('error', (e) => { setConnUI('disconnected'); addAppLog('SYS', '연결 오류: ' + e.message); });
   client.on('offline', () => setConnUI('disconnected'));
@@ -448,7 +449,14 @@ function toggleConnect() {
         addOtaLog('SYS', '▶ OTA 결과: ' + d.msg);
         if (d.status === 'ok') addOtaLog('SYS', '── ESP32 재시작 중... ──');
       } catch(e) {}
+    } else if (topic === 'esp32/info') {      // ← 여기
+    const ipInput = document.getElementById('portal-ip');
+    ipInput.value = str;
+    ipInput.style.color = '#7ec8a0';
+    document.getElementById('btn-portal-open').disabled = false;
+    addAppLog('SYS', '📡 ESP32 IP: ' + str);
     }
+   
   });
 }
 
