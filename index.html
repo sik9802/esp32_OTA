@@ -26,9 +26,11 @@
   .btn-ota { padding: 7px 16px; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; white-space: nowrap; }
   .btn-ota:hover { background: #333; }
   .btn-ota:disabled { background: #ccc; cursor: not-allowed; }
-  .ota-preset { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 0.5rem; }
-  .ota-preset-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid #ddd; background: #fafafa; cursor: pointer; color: #555; }
-  .ota-preset-btn:hover { background: #f0f0f0; border-color: #999; }
+  .ota-select-row { display: flex; gap: 8px; margin-bottom: 0.75rem; align-items: center; }
+  .ota-select-label { font-size: 11px; color: #888; white-space: nowrap; }
+  .ota-select { flex: 1; font-size: 12px; padding: 6px 10px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; color: #1a1a1a; outline: none; cursor: pointer; }
+  .ota-select:focus { border-color: #888; background: #fff; }
+  .ota-select-hint { font-size: 11px; color: #aaa; margin-bottom: 0.5rem; }
   .ota-result { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #f0f0f0; color: #666; }
   .ota-result.ok { background: #eaf6ee; color: #2a7a42; }
   .ota-result.fail { background: #fdecea; color: #cc3333; }
@@ -77,8 +79,6 @@
   .btn-connect:hover { background: #f0f0f0; }
   .btn-connect.active { background: #eaf6ee; border-color: #52b26a; color: #2a7a42; }
   .footer-bar { display: flex; justify-content: space-between; font-size: 11px; color: #bbb; padding: 0 2px; }
-
-  /* Section divider */
   .term-divider { font-size: 10px; color: #444; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #2a2a2a; }
 </style>
 </head>
@@ -101,12 +101,14 @@
     <div class="ota-url-row">
       <input id="ota-url" class="ota-url-input" type="text"
         placeholder="펌웨어 URL (.bin)"
-        value="https://github.com/sik9802/esp32_OTA/releases/download/v1.1/blink_test.bin">
+        value="https://github.com/sik9802/esp32_OTA/releases/latest/download/blink_test.bin">
       <button class="btn-ota" id="btn-ota" onclick="sendOta()" disabled>전송</button>
     </div>
-    <div class="ota-preset">
-      <button class="ota-preset-btn" onclick="setUrl('https://github.com/sik9802/esp32_OTA/releases/download/v1.0/blink_test.bin')">v1.0</button>
-      <button class="ota-preset-btn" onclick="setUrl('https://github.com/sik9802/esp32_OTA/releases/download/v1.1/blink_test.bin')">v1.1</button>
+    <div class="ota-select-row">
+      <span class="ota-select-label">버전 선택</span>
+      <select id="ota-select" class="ota-select" onchange="onSelectVersion()">
+        <option value="">-- 불러오는 중... --</option>
+      </select>
     </div>
     <div id="ota-result" class="ota-result">⏸ 대기 중</div>
   </div>
@@ -188,17 +190,56 @@ let pubCount = 0;
 let autoScroll = true;
 let appLogPaused = false;
 const MAX_LOG_LINES = 200;
+const GITHUB_REPO = 'sik9802/esp32_OTA';
+const BIN_FILENAME = 'blink_test.bin';
 
-// OTA 관련 태그 목록
 const OTA_TAGS = ['OTA', 'esp_https_ota', 'esp-x509-crt-bundle', 'esp_image', 'HTTP_CLIENT'];
 
 function isOtaLog(raw) {
   return OTA_TAGS.some(tag => raw.includes(tag));
 }
 
-function setUrl(url) {
-  document.getElementById('ota-url').value = url;
+// ── GitHub Releases 동적 로드 ─────────────────
+async function loadReleases() {
+  const sel = document.getElementById('ota-select');
+  try {
+    const res = await fetch('https://api.github.com/repos/' + GITHUB_REPO + '/releases');
+    const releases = await res.json();
+    sel.innerHTML = '';
+
+    // latest 고정 옵션 (항상 최상단)
+    const latestOpt = document.createElement('option');
+    latestOpt.value = 'https://github.com/' + GITHUB_REPO + '/releases/latest/download/' + BIN_FILENAME;
+    latestOpt.textContent = '⭐ latest (최신)';
+    sel.appendChild(latestOpt);
+
+    // 릴리즈 목록 (최신순)
+    releases.forEach(r => {
+      const asset = r.assets.find(a => a.name === BIN_FILENAME);
+      if (!asset) return;
+      const opt = document.createElement('option');
+      opt.value = asset.browser_download_url;
+      opt.textContent = r.tag_name + (r.prerelease ? ' (pre)' : '');
+      sel.appendChild(opt);
+    });
+
+    // 기본값 URL과 일치하는 옵션 선택
+    const currentUrl = document.getElementById('ota-url').value;
+    for (const opt of sel.options) {
+      if (opt.value === currentUrl) { opt.selected = true; break; }
+    }
+  } catch (e) {
+    sel.innerHTML = '<option value="">릴리즈 로드 실패</option>';
+  }
 }
+
+function onSelectVersion() {
+  const sel = document.getElementById('ota-select');
+  if (sel.value) document.getElementById('ota-url').value = sel.value;
+}
+
+// 페이지 로드 시 자동 실행
+loadReleases();
 
 function sendOta() {
   if (!client || !client.connected) { addOtaLog('SYS', 'MQTT가 연결되지 않았습니다.'); return; }
