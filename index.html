@@ -145,6 +145,11 @@
         onclick="openPortal()" disabled
         style="background:#444;">열기</button>
     </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+     <button class="btn-ota" id="btn-restart"
+       onclick="sendRestart()" disabled
+       style="background:#c0392b;flex:1;">🔄 원격 재시작</button>
+    </div>
   </div>
 
   <!-- App Log Terminal -->
@@ -281,7 +286,19 @@ function sendConfigEnter() {
     }
   });
 }
-
+ 
+function sendRestart() {
+  if (!client || !client.connected) return;
+  if (!confirm('ESP32를 재시작하시겠습니까?')) return;
+  client.publish('device/restart', '1', { qos: 1 }, (err) => {
+    if (err) {
+      addAppLog('SYS', '재시작 명령 전송 실패: ' + err.message);
+    } else {
+      addAppLog('SYS', '🔄 원격 재시작 명령 전송 완료');
+    }
+  });
+}
+ 
 // ── IP 자동 감지 ───────────────────────────────
 function tryParseIP(logStr) {
   const m = logStr.match(/IP 할당: ([\d.]+)/);
@@ -385,6 +402,7 @@ function setConnUI(state) {
   const appDot = document.getElementById('app-term-dot');
   const otaDot = document.getElementById('ota-term-dot');
   const btnPortal = document.getElementById('btn-portal');
+  const btnRestart = document.getElementById('btn-restart');
   const ipInput = document.getElementById('portal-ip');
 
   if (state === 'connected') {
@@ -392,6 +410,7 @@ function setConnUI(state) {
     btn.textContent = '연결 해제'; btn.className = 'btn-connect active';
     btnOta.disabled = false;
     btnPortal.disabled = false;
+    btnRestart.disabled = false;
     appDot.className = 'term-dot'; otaDot.className = 'term-dot ota-active';
     addAppLog('SYS', '── MQTT 연결됨. 로그 수신 시작 ──');
   } else if (state === 'connecting') {
@@ -405,6 +424,7 @@ function setConnUI(state) {
     btn.textContent = '연결'; btn.className = 'btn-connect';
     btnOta.disabled = true;
     btnPortal.disabled = true;
+    btnRestart.disabled = true;
     ipInput.value = '';
     ipInput.style.color = '#aaa';
     document.getElementById('btn-portal-open').disabled = true;
