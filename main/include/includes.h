@@ -8,9 +8,10 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "lwip/ip4_addr.h"
+#include "nvs_flash.h"
 #include "uart_modbus.h"
 #include "verify_test.h"
 #include "enc28j60.h"
 #include "wifi_mqtt.h"
-
+#include "config_portal.h"
 #endif // INCLUDES_H

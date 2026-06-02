@@ -612,7 +612,7 @@ static void enc28j60_rx_task(void *arg)
                 enc28j60_set_bank(1);
                 uint8_t erxfcon = enc28j60_rcr(0x18);
                 uint8_t epktcnt = enc28j60_rcr(EPKTCNT);
-                ESP_LOGI(TAG, "[diag] ECON1=0x%02X ERXFCON=0x%02X EPKTCNT=%d",
+                ESP_LOGD(TAG, "[diag] ECON1=0x%02X ERXFCON=0x%02X EPKTCNT=%d",
                          econ1, erxfcon, epktcnt);
 
                 enc28j60_set_bank(2);
@@ -637,8 +637,8 @@ static void enc28j60_rx_task(void *arg)
                 xSemaphoreGive(s_spi_mutex);
                 ESP_LOGD(TAG, "[diag] PHID1=0x%04X PHSTAT1=0x%04X Link:%s",
                          phid1, phstat, (phstat & PHSTAT1_LLSTAT) ? "UP" : "DOWN");
-                ESP_LOGI(TAG, "[diag] ISR count=%lu", (unsigned long)s_isr_count);
-                ESP_LOGI(TAG, "[diag] free heap=%lu", (unsigned long)esp_get_free_heap_size());
+                ESP_LOGD(TAG, "[diag] ISR count=%lu", (unsigned long)s_isr_count);
+                ESP_LOGD(TAG, "[diag] free heap=%lu", (unsigned long)esp_get_free_heap_size());
             }
     }
     }

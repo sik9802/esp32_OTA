@@ -109,7 +109,7 @@ esp_err_t modbus_send_fc03(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_c
     frame[7] = (crc >> 8) & 0xFF;  // CRC High
 
     // 송신 로그
-    ESP_LOGI(TAG, "FC03 송신: [%02X][%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
+    ESP_LOGD(TAG, "FC03 송신: [%02X][%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
              frame[0], frame[1], frame[2], frame[3],
              frame[4], frame[5], frame[6], frame[7]);
 
@@ -124,7 +124,7 @@ esp_err_t modbus_send_fc03(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_c
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "FC03 송신 완료 (%d bytes)", bytes_sent);
+    ESP_LOGD(TAG, "FC03 송신 완료 (%d bytes)", bytes_sent);
     return ESP_OK;
 }
 
@@ -142,7 +142,7 @@ esp_err_t modbus_send_fc04(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_c
     frame[6] = crc & 0xFF;
     frame[7] = (crc >> 8) & 0xFF;
 
-    ESP_LOGI(TAG, "FC04 송신: [%02X][%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
+    ESP_LOGD(TAG, "FC04 송신: [%02X][%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
              frame[0], frame[1], frame[2], frame[3],
              frame[4], frame[5], frame[6], frame[7]);
 
@@ -153,7 +153,7 @@ esp_err_t modbus_send_fc04(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_c
         return ESP_FAIL;
     }
     
-    ESP_LOGI(TAG, "FC04 송신 완료 (%d bytes)", bytes_sent);  // 추가
+    ESP_LOGD(TAG, "FC04 송신 완료 (%d bytes)", bytes_sent);  // 추가
     
     return ESP_OK;
 }
@@ -171,7 +171,7 @@ esp_err_t modbus_recv_fc04(uint8_t *data_out, uint16_t *data_len)
         return ESP_ERR_TIMEOUT;
     }
 
-    ESP_LOGI(TAG, "FC04 수신 (%d bytes): [%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
+    ESP_LOGD(TAG, "FC04 수신 (%d bytes): [%02X][%02X][%02X][%02X][%02X][%02X][%02X]",
              bytes_read,
              rx_buf[0], rx_buf[1], rx_buf[2],
              rx_buf[3], rx_buf[4], rx_buf[5], rx_buf[6]);
@@ -188,7 +188,7 @@ esp_err_t modbus_recv_fc04(uint8_t *data_out, uint16_t *data_len)
 
     *data_len = rx_buf[2];
     memcpy(data_out, &rx_buf[3], *data_len);
-    ESP_LOGI(TAG, "FC04 수신 완료 (%d bytes)", bytes_read);
+    ESP_LOGD(TAG, "FC04 수신 완료 (%d bytes)", bytes_read);
     return ESP_OK;
 }
 
@@ -215,7 +215,7 @@ esp_err_t modbus_send_fc06(uint8_t slave_addr, uint16_t reg_addr, uint16_t value
         return ESP_FAIL;
     }
 
-    ESP_LOGI("MODBUS", "FC06 TX: [%02X %02X %02X %02X %02X %02X %02X %02X]",
+    ESP_LOGD("MODBUS", "FC06 TX: [%02X %02X %02X %02X %02X %02X %02X %02X]",
              frame[0], frame[1], frame[2], frame[3],
              frame[4], frame[5], frame[6], frame[7]);
     return ESP_OK;
@@ -240,7 +240,7 @@ esp_err_t modbus_recv_fc06(uint8_t *data_out, uint16_t *data_len)
         return ESP_FAIL;
     }
 
-    ESP_LOGI("MODBUS", "FC06 RX (%d bytes): [%02X %02X %02X %02X %02X %02X %02X %02X]",
+    ESP_LOGD("MODBUS", "FC06 RX (%d bytes): [%02X %02X %02X %02X %02X %02X %02X %02X]",
              len, data_out[0], data_out[1], data_out[2], data_out[3],
              data_out[4], data_out[5], data_out[6], data_out[7]);
     return ESP_OK;
@@ -262,7 +262,7 @@ esp_err_t modbus_read_sensor(sensor_data_t *sensor)
     sensor->temperature = ((data[0] << 8) | data[1]) / 10.0f;
     sensor->humidity    = ((data[2] << 8) | data[3]) / 10.0f;
 
-    ESP_LOGI(TAG, "온도: %.1f℃  습도: %.1f%%",
+    ESP_LOGD(TAG, "온도: %.1f℃  습도: %.1f%%",
              sensor->temperature, sensor->humidity);
     return ESP_OK;
 }
@@ -300,7 +300,7 @@ esp_err_t modbus_send_fc16(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_c
         return ESP_FAIL;
     }
 
-    ESP_LOGI("MODBUS", "FC16 TX (%d bytes):", frame_len);
+    ESP_LOGD("MODBUS", "FC16 TX (%d bytes):", frame_len);
     ESP_LOG_BUFFER_HEX("MODBUS", frame, frame_len);
     return ESP_OK;
 }
@@ -322,7 +322,7 @@ esp_err_t modbus_recv_fc16(uint8_t *data_out, uint16_t *data_len)
         return ESP_FAIL;
     }
 
-    ESP_LOGI("MODBUS", "FC16 RX (%d bytes):", len);
+    ESP_LOGD("MODBUS", "FC16 RX (%d bytes):", len);
     ESP_LOG_BUFFER_HEX("MODBUS", data_out, len);
     return ESP_OK;
 }

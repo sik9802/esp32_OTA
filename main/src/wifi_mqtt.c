@@ -16,13 +16,15 @@
 
 
 
+
 #define TAG          "WIFI_MQTT"
 
+/* cloud Define 관련
 // ── HiveMQ Cloud 브로커 설정 ───────────────────
 #define MQTT_BROKER_URI  "mqtts://604efa86dab4428c9f2f4de139f5ca0a.s1.eu.hivemq.cloud:8883"
 #define MQTT_USERNAME    "chunsik"
 #define MQTT_PASSWORD    "ESP32server"
-
+*/
 
 static QueueHandle_t s_log_queue = NULL;
 static bool s_mqtt_connected = false;
@@ -39,6 +41,7 @@ static EventGroupHandle_t s_net_events;
 static void eth_got_ip_handler(void *arg, esp_event_base_t base,
                                 int32_t id, void *data)
 {
+    const app_config_t *cfg = (const app_config_t *)arg;  // ← 추가
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
     ESP_LOGI(TAG, "ENC28J60 IP 할당: " IPSTR " / GW: " IPSTR,
              IP2STR(&event->ip_info.ip),
@@ -46,9 +49,8 @@ static void eth_got_ip_handler(void *arg, esp_event_base_t base,
     xEventGroupSetBits(s_eth_event_group, ETH_GOT_IP_BIT);
     xEventGroupSetBits(s_net_events, IP_ACQUIRED_BIT);  // ← 추가
     // ← 여기서 MQTT 시작 (IP 확보 보장됨)
-    mqtt_start();
+    mqtt_start(cfg);
 }
-
 static void eth_lost_ip_handler(void *arg, esp_event_base_t base,
                                  int32_t id, void *data)
 {
@@ -108,6 +110,16 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
         s_mqtt_connected = true;                           // ← 추가
         esp_mqtt_client_subscribe(client, "ota/update", 1);
         esp_mqtt_client_subscribe(client, "log/control", 1);  // ← 추가
+        esp_mqtt_client_subscribe(client, "config/enter",   1);  // ← 추가
+        esp_mqtt_client_subscribe(client, "device/restart", 1);  // ← 추가
+        // IP publish
+        esp_netif_ip_info_t ip_info;
+        esp_netif_t *netif = enc28j60_get_netif();
+        if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK) {
+            char ip_str[32];
+            snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&ip_info.ip));
+            esp_mqtt_client_publish(s_mqtt_client, "esp32/info", ip_str, 0, 0, 0);
+        }
         break;
     case MQTT_EVENT_DISCONNECTED:
         s_mqtt_connected = false;                          // ← 추가
@@ -116,6 +128,7 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
     case MQTT_EVENT_ERROR:
         ESP_LOGE(TAG, "MQTT 에러");
         break;
+    // mqtt 토픽 데이터
     case MQTT_EVENT_DATA:
         if (strncmp(event->topic, "ota/update", event->topic_len) == 0) {
             static char url[256];
@@ -132,36 +145,46 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                 ESP_LOGI(TAG, "로그 전송 재개");
             }
         }
+        else if (strncmp(event->topic, "config/enter", event->topic_len) == 0) {
+                    xTaskCreate((TaskFunction_t)config_portal_request,
+                                "portal_task", 4096, NULL, 5, NULL);
+        }
+        else if (strncmp(event->topic, "device/restart", event->topic_len) == 0) {
+            ESP_LOGW(TAG, "원격 재시작 명령 수신");
+            vTaskDelay(pdMS_TO_TICKS(500));
+            esp_restart();
+        }
         break;
-
+    
     default:
         break;
 }
 }
 
 // ── 공개 API ───────────────────────────────────
-esp_err_t wifi_mqtt_init(void)
+esp_err_t wifi_mqtt_init_with_config(const app_config_t *cfg)
 {
     s_net_events = xEventGroupCreate();
-    // NVS 초기화 (MQTT 내부에서 필요)
+    /*// NVS 초기화 (MQTT 내부에서 필요)
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(ret);
+    ESP_ERROR_CHECK(ret);  
+    */
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    //ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // ENC28J60 IP 할당 대기용 이벤트 그룹
+        // ENC28J60 IP 할당 대기용 이벤트 그룹
     s_eth_event_group = xEventGroupCreate();
     ESP_ERROR_CHECK(esp_event_handler_register(
         IP_EVENT, IP_EVENT_ETH_GOT_IP,
-        &eth_got_ip_handler, NULL));
+        &eth_got_ip_handler, (void *)cfg));  // ← NULL → cfg
 
     ESP_ERROR_CHECK(esp_event_handler_register(
-    IP_EVENT, IP_EVENT_ETH_LOST_IP,
-    &eth_lost_ip_handler, NULL));
+        IP_EVENT, IP_EVENT_ETH_LOST_IP,
+        &eth_lost_ip_handler, NULL));
 
     return ESP_OK;
 }
@@ -173,16 +196,19 @@ void wait_for_ip(void)
                         pdFALSE, pdTRUE, portMAX_DELAY);
 }
 
-esp_err_t mqtt_start(void)
+esp_err_t mqtt_start(const app_config_t *cfg)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
-            .address.uri = MQTT_BROKER_URI,
+            .address.uri = cfg->mqtt_broker,
             .verification.crt_bundle_attach = esp_crt_bundle_attach,
         },
         .credentials = {
-            .username = MQTT_USERNAME,
-            .authentication.password = MQTT_PASSWORD,
+            .username = cfg->mqtt_user,
+            .authentication.password = cfg->mqtt_pass,
+        },
+        .network = {
+        .reconnect_timeout_ms = 5000,  // ← 추가: 5초마다 재시도
         },
     };
 
@@ -191,11 +217,11 @@ esp_err_t mqtt_start(void)
         return ESP_FAIL;
     }
     s_mqtt_client = client;
+    ota_set_client(client);  // ← 추가
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
     s_log_queue = xQueueCreate(20, sizeof(char *));
     xTaskCreate(log_publish_task, "log_pub", 4096, NULL, 3, NULL);
-    esp_log_set_vprintf(mqtt_log_vprintf);
     esp_log_set_vprintf(mqtt_log_vprintf);
 
     return ESP_OK;
