@@ -21,6 +21,13 @@ esp_err_t modbus_recv_fc06(uint8_t *data_out, uint16_t *data_len);
 esp_err_t modbus_send_fc16(uint8_t slave_addr, uint16_t reg_addr, uint16_t reg_count, uint16_t *values);
 esp_err_t modbus_recv_fc16(uint8_t *data_out, uint16_t *data_len);
 
+typedef void (*modbus_scan_cb_t)(uint8_t id, bool found, void *user_data);
+void modbus_scan_slaves_with_cb(uint8_t start, uint8_t end,
+                                  uint16_t timeout_ms,
+                                  modbus_scan_cb_t cb,
+                                  void *user_data);
+
+
 typedef struct {
     float temperature;
     float humidity;

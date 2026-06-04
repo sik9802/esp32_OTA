@@ -351,3 +351,66 @@ void modbus_scan_slaves(void)
         vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
+
+
+// ── Modbus 슬레이브 스캔 (콜백 방식) ────────────────────────────────────────
+//
+//  start       : 스캔 시작 ID (보통 1)
+//  end         : 스캔 끝 ID  (보통 20 또는 247)
+//  timeout_ms  : 슬레이브 응답 대기시간 (ms), 9600baud 기준 200ms 권장
+//  cb          : 각 ID 결과 콜백 → found=true면 응답 있음
+//  user_data   : 콜백에 그대로 전달 (mqtt client handle 등)
+//
+//  기존 modbus_scan_slaves()와 차이:
+//    ① break 없음 → 전체 범위 탐색
+//    ② 외부 콜백으로 결과 전달 → MQTT publish 등 자유롭게 처리
+//    ③ uart_flush_input() 으로 이전 잔여 데이터 제거
+// ────────────────────────────────────────────────────────────────────────────
+void modbus_scan_slaves_with_cb(uint8_t start, uint8_t end,
+                                 uint16_t timeout_ms,
+                                 modbus_scan_cb_t cb,
+                                 void *user_data)
+{
+    ESP_LOGI(TAG, "슬레이브 스캔 시작: ID %d ~ %d (timeout %dms)",
+             start, end, timeout_ms);
+
+    for (uint8_t id = start; id <= end; id++) {
+
+        // 이전 수신 잔여 데이터 제거 (필수)
+        // → 이전 슬레이브 응답이 FIFO에 남으면 다음 ID 응답으로 오인
+        uart_flush_input(MODBUS_UART_NUM);
+
+        // FC04 요청 송신 (reg 0x0001, count 1)
+        // → XY-MD02 계열은 FC04가 기본; FC03도 가능하나 FC04로 통일
+        modbus_send_fc04(id, 0x0001, 0x0001);
+
+        // 송신 완료 대기
+        // → RS-485 Half-Duplex: 송신 중 수신 차단 → 완료 후에야 응답 수신 가능
+        uart_wait_tx_done(MODBUS_UART_NUM, pdMS_TO_TICKS(50));
+
+        // 응답 수신 대기
+        uint8_t rx_buf[32] = {0};
+        int bytes_read = uart_read_bytes(MODBUS_UART_NUM,
+                                          rx_buf,
+                                          sizeof(rx_buf),
+                                          pdMS_TO_TICKS(timeout_ms));
+
+        bool found = (bytes_read > 0);
+
+        if (found) {
+            ESP_LOGI(TAG, "슬레이브 발견! ID: %d (0x%02X) → %d bytes",
+                     id, id, bytes_read);
+        }
+
+        // 콜백 호출 (found 여부 + 원본 버퍼 전달)
+        if (cb != NULL) {
+            cb(id, found, user_data);
+        }
+
+        // 프레임 간 최소 간격
+        // → Modbus 3.5 character time @ 9600baud ≈ 4ms, 여유분 20ms
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+
+    ESP_LOGI(TAG, "슬레이브 스캔 완료: ID %d ~ %d", start, end);
+}
